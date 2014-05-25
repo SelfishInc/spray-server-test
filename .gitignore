@@ -1,0 +1,12 @@
+.idea/
+.idea_modules
+*.iws
+*.iml
+
+#Hidden files
+.*
+!.gitignore
+
+target/
+project/target/
+lib_managed/
