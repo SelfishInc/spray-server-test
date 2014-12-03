@@ -82,8 +82,8 @@ object ApplicationBuild extends Build {
 object Versions {
   val LogbackVersion = "1.1.2"
   val scalaVer = "2.10.4"
-  val AkkaVersion = "2.3.3"
-  val SprayJson = "1.2.6"
+  val AkkaVersion = "2.3.6"
+  val SprayJson = "1.3.1"
   val SprayVersion = "1.3.1"
   val ScalaTestVersion = "2.1.7"
 }

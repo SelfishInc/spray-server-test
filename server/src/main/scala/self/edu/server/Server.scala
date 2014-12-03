@@ -17,7 +17,6 @@ object Server {
   def main(args: Array[String]): Unit = {
     implicit val system = ActorSystem("server")
 
-    system.actorOf(Props[Worker], "Worker")
     system.actorOf(Props[Router], "Router")
     val dispatcher = system.actorOf(Props[RequestDispatcher], "RequestDispatcher")
     IO(Http).tell(Http.Bind(

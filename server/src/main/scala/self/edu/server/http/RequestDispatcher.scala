@@ -5,6 +5,7 @@ import akka.actor._
 import spray.http._
 import spray.can.Http
 import spray.httpx.unmarshalling._
+import spray.httpx.marshalling._
 import akka.pattern.{ask, pipe}
 import spray.http.HttpResponse
 import akka.util.Timeout
@@ -12,8 +13,6 @@ import spray.routing.RequestContext
 import akka.actor.SupervisorStrategy.Stop
 import scala.concurrent.Future
 import spray.json.{JsonParser, JsonReader, DefaultJsonProtocol}
-import com.sun.xml.internal.ws.encoding.soap.DeserializationException
-import self.edu.server.json
 
 
 /**
@@ -21,47 +20,36 @@ import self.edu.server.json
  */
 class RequestDispatcher extends Actor with HttpService with ActorLogging with PerRequestCreator {
 
-  import json.CustomUnmarshaller._
-
 
   def actorRefFactory: ActorContext = context
 
-  val worker = context.actorSelection("/user/Worker")
   val router = context.actorSelection("/user/Router")
 
   def receive: Receive = serviceMessage orElse runRoute(route)
 
 
   import concurrent.duration._
-  import context.dispatcher
+  implicit val ec = context.dispatcher
+//  implicit val ec = context.system.dispatchers.lookup("http-dispatcher")
   implicit val requestTimeout = Timeout(3.seconds)
 
 
   val route: Route =
-    (path("simple") & post) {
-      complete(HttpResponse(StatusCodes.OK, "simple response"))
-    } ~ (path("future") & post) {
-      complete(Future(
-        HttpResponse(StatusCodes.OK, "simple future response")
-      ))
-    } ~ (path("perRequest") & post) { ctx =>
-      perRequest(ctx, worker, WorkerRequest)
-    } ~ (path("askWorker") & post) {
-      complete{ worker ? WorkerRequest map {
-        case r: ResponseMessage => r.json
+    (path("simple") & get) {
+      complete(ok("simple response"))
+    } ~
+    (path("run" / "cpu") & get) {
+      complete{ router ? CPUWork() map {
+        case r: ResponseMessage => ok(r.json)
       }}
-    } ~ (path("askRouter") & post) {
-      complete{ router ? WorkerRequest map {
-        case r: ResponseMessage => r.json
+    } ~
+    (path("run" / "io") & get) {
+      complete{ router ? IOWork() map {
+        case r: ResponseMessage => ok(r.json)
       }}
-    } ~ (path("parseJson") & post) {
-      entity(as[WorkerJsonRequest]) { request => ctx =>
-        ctx.complete{
-          router ? request map {
-          case r: ResponseMessage => r.json
-        }}
-      }
     }
+
+  private def ok(str: String) = HttpResponse(StatusCodes.OK, str)
 
 
   def serviceMessage: Receive = {
@@ -74,12 +62,9 @@ class RequestDispatcher extends Actor with HttpService with ActorLogging with Pe
 
 
 trait RequestMessage
-object WorkerRequest extends RequestMessage
-case class WorkerJsonRequest(param1: String, param2: Option[String]) extends RequestMessage
-object WorkerJsonRequest extends DefaultJsonProtocol {
-  implicit val workerJsonRequestJF = jsonFormat(WorkerJsonRequest.apply, "param1", "param2")
-}
-object RouterRequest extends RequestMessage
+class WorkerRequest(val aType: String) extends RequestMessage
+case class CPUWork() extends WorkerRequest("cpu")
+case class IOWork() extends WorkerRequest("io")
 
 trait ResponseMessage {def json: String}
 object SuccessResponse extends ResponseMessage {
